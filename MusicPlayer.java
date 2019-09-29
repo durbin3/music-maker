@@ -1,17 +1,13 @@
 import com.sun.jdi.connect.Connector;
 import org.w3c.dom.ls.LSOutput;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.Scanner;
+import java.util.*;
 import javax.crypto.spec.PSource;
 import javax.sound.midi.*;
 import javax.swing.*;
 
 //TODO: rhythm generator
 //TODO: chord inversions
-//TODO: undirected graph nodes
 
 class Tree {
     Tree left = null;
@@ -48,8 +44,14 @@ class Notes {
     int seventh;
     int ninth;
     boolean minor;
+
     Notes(String chord) {
-        root = major_scale["cdefgab".indexOf(chord.toLowerCase().charAt(0))];
+        if("cdefgab".contains(chord.toLowerCase())){ root = major_scale["cdefgab".indexOf(chord.toLowerCase().charAt(0))]; }
+        else {
+            if(chord.toLowerCase().contains("n")){ // adfsadf = new Note("N6")
+                root = major_scale[1] - 1;
+            }
+        }
         minor = chord.substring(0,1).toLowerCase().equals(chord.substring(0,1));
         if(minor) {
             third = root + 3;
@@ -98,7 +100,7 @@ class Connectors {
     int end; ////index of the end   node
     double weight;
 
-    static String[] roman = new String[]{"i","ii","iii","iv","v","vi","vii"};
+    static String[] roman = new String[]{"i","ii","iii","iv","v","vi","vii", "n"};
     static int toval(String inp) {
         for (int i=0;i<roman.length;i++) {
             if (roman[i].equals(inp)) {
@@ -143,7 +145,7 @@ class Path {
     }
 }
 class Graph {
-    ArrayList<Nodes> nodes = new ArrayList<Nodes>(); // array [Nodes, Nodes, Nodes] >> ["C", "g", "a7"] >> "C".getNote() >> [1,4,7,,,] // contains the music theory in weights
+    ArrayList<Nodes> nodes = new ArrayList<Nodes>(); // array [Nodes, Nodes, Nodes] >> ["C", "g", "a7"] >> "C".getNote().root >> 1 or 3 or 5 or etc.
     ArrayList<Connectors> connectors = new ArrayList<Connectors>(); // array [Connectors, Connectors] || Connectors >> .start, .end, .weight
     ArrayList<Connectors> getConnected(int node) { // returns array of connectors that connect to a specific node
         ArrayList<Connectors> connectionList = new ArrayList<Connectors>();
@@ -156,21 +158,27 @@ class Graph {
     }
     Path randomPathTo(int length,Path startpath,int endnode) {
         int lastnode = startpath.paths.get(startpath.paths.size()-1);
-        if (length == 0) {
+        if (length == 1) {
             if (lastnode == endnode) {return startpath;}
             return null;
         }
-        double rand = Math.random();
         ArrayList<Connectors> cArray = getConnected(lastnode);
-
         ArrayList<Path> pArray = new ArrayList<Path>();
+
+        double rand = Math.random();
         for (Connectors connect:cArray) {
             Path nextpath = randomPathTo(length-1,startpath.thenTo(connect),endnode);
-            if (nextpath != null) {pArray.add(nextpath);}
+            if (nextpath != null) {
+                pArray.add(nextpath);
+            }
         }
         Path co = null;
+        double totalWeight = 0;
+        for(Path path : pArray) {
+            totalWeight += path.weight;
+        }
         for (Path path : pArray) {
-            rand -= path.weight; //e.g. rand = .39, .39 - .4 <0, co = this one
+            rand -= path.weight/totalWeight; //e.g. rand = .39, .39 - .4 <0, co = this one
             if (rand < 0) {
                 co = path;
                 break;
@@ -181,9 +189,15 @@ class Graph {
     void normalize() {
 
     }
-//    ArrayList<4Notes> toMusical(Path p) {
-//
-//    }
+    ArrayList<Notes> toMusical(Path p) {
+        //[1,2,5,1]
+        ArrayList<Notes> notes= new ArrayList<Notes>();
+
+        for (int index : p.paths){
+            notes.add(nodes.get(index).getNotes());
+        }
+        return notes;
+    }
     void updateNodes(String[] strings) {
         nodes.clear();
         for (String g : strings) {
@@ -221,7 +235,8 @@ class Graph {
                 {"ii", "vii", "0.5"},
                 {"ii", "v"  , "0.5"},
                 {"iv", "v"  , "0.5"},
-                {"iv", "vii", "0.5"},
+                {"iv", "vii", "0.2"},
+                {"iv", "i"  , "0.3"},
 
                 //dominants
                 {"v" , "i"  , "1.0"},
@@ -252,9 +267,10 @@ class Graph {
                 //pre-dominants
                 {"ii", "vii", "0.5"},
                 {"ii", "v", "0.5"},
-                {"iv", "v", "0.5"},
-                {"iv", "vii", "0.3"},
-                {"iv", "iii", "0.2"},
+                {"iv", "v", "0.35"},
+                {"iv", "vii", "0.25"},
+                {"iv", "iii", "0.15"},
+                {"iv", "i"  , "0.25"},
 
                 //dominants
                 {"v", "i", "1.0"},
@@ -262,11 +278,19 @@ class Graph {
         });
         return graph;
     }
-
-
-}
+}// end graph
 
 public class MusicPlayer {
+    public void createNote(int note, int tick, Track track) throws InvalidMidiDataException {
+        ShortMessage a = new ShortMessage();
+        a.setMessage(144,1,note,100); //144 = on, 1 = keyboard, 44 = note, 100 = how loud and hard
+        MidiEvent noteOn = new MidiEvent(a, tick); // start at tick 1
+        track.add(noteOn);
+        ShortMessage b = new ShortMessage();
+        b.setMessage(128, 1, note, 100); //note off
+        MidiEvent noteOff = new MidiEvent(b, tick+15); // stop at tick 16
+        track.add(noteOff);
+    }
     public void GUI(){
         JFrame frame = new JFrame();
         JButton button = new JButton("Click this");
@@ -277,103 +301,49 @@ public class MusicPlayer {
     }
     public void play() throws MidiUnavailableException, InvalidMidiDataException {
 //            GUI();
-            Sequencer player = MidiSystem.getSequencer();
-            player.open();
-            Sequence seq = new Sequence(Sequence.PPQ, 4);
-            Track track = seq.createTrack();
-            Scanner s = new Scanner(System.in);
-            System.out.println("How long do you want the chord progression to be?");
-            int progresLen = s.nextInt();
-            s.nextLine();
-            System.out.println("Major, minor, or blues?");
-            String type = s.nextLine().toLowerCase();
-            Integer[] chords = new Integer[progresLen];
+        Sequencer player = MidiSystem.getSequencer();
+        player.open();
+        Sequence seq = new Sequence(Sequence.PPQ, 4);
+        Track track = seq.createTrack();
+        Scanner s = new Scanner(System.in);
+        System.out.println("How long do you want the chord progression to be?");
+        int progresLen = s.nextInt();
+        s.nextLine();
+        System.out.println("Major, or minor?");
+        String type = s.nextLine().toLowerCase();
+        Graph g = new Graph();
+        Graph graph = new Graph();
+        if(type.equals("minor")) {
+            graph = g.Minorgraph();
+        } else if(type.equals("major")) {
+            graph = g.Majorgraph();
+        }
 
-            //chord progressions
+        Integer[] major_scale = new Integer[]{1, 3, 5, 6, 8, 10, 12, 13};
+        Integer[] minor_scale = new Integer[]{1, 3, 4, 6, 8, 9, 11, 13};
+        Integer[] blues_scale = new Integer[]{1, 4, 6, 7, 8, 11, 13};
 
+        Path path = new Path(0);
+        ArrayList<Notes> notes = graph.toMusical(graph.randomPathTo(progresLen, path, 0));
 
-
-
-            switch (type){
-                case "minor":
-                    chords= major_minor(progresLen);
-                    break;
-                case "major":
-                    chords = major_minor(progresLen);
-                    break;
-                case "blues":
-                    chords = blues(progresLen);
-                    break;
-                default:
-                    System.out.println("Error, no type selected");
-            }
+        for(Notes not: notes){
+            System.out.println(Arrays.asList(major_scale).indexOf(not.root) + 1);
+        }
             int tick = 1;
             int octave = 52;
-            Integer[] major_scale = new Integer[]{1, 3, 5, 6, 8, 10, 12, 13};
-            Integer[] minor_scale = new Integer[]{1, 3, 4, 6, 8, 9, 11, 13};
-            Integer[] blues_scale = new Integer[]{1, 4, 6, 7, 8, 11, 13};
-            Integer[] scale = new Integer[chords.length];
-            for(int i = 0; i < chords.length; i++){
-                System.out.println(chords[i]);
-                if(type.equals("major")){
-                    scale[i] = major_scale[chords[i]-1];
+            //tick, octave, array list of Notes,
+            for (Notes note : notes){
+                createNote(note.root  + octave, tick, track);
+                createNote(note.third + octave, tick, track);
+                createNote(note.fifth + octave, tick, track);
+                if(note.seventh != 0){
+                    createNote(note.seventh + octave, tick, track);
                 }
-                else if (type.equals("minor")){
-                    scale[i] = minor_scale[chords[i]-1];
+                if(note.ninth != 0){
+                    createNote(note.ninth + octave, tick, track);
                 }
-                else if (type.equals("blues")){
-                    scale[i] = major_scale[chords[i]-1];
-                }
-            }
-            for (int halfstep : scale){
-//                System.out.println(halfstep);
-                int root = halfstep + octave;
-                int third = type.equals("major")? halfstep + octave + 4 : halfstep + octave + 3;
-                int fifth = halfstep + octave + 7;
-                int seventh = halfstep + octave + 10;
-                //root
-                ShortMessage a = new ShortMessage();
-                a.setMessage(144,1,root,100); //144 = on, 1 = keyboard, 44 = note, 100 = how loud and hard
-                MidiEvent noteOn = new MidiEvent(a, tick); // start at tick 1
-                track.add(noteOn);
-                ShortMessage b = new ShortMessage();
-                b.setMessage(128, 1, root, 100); //note off
-                MidiEvent noteOff = new MidiEvent(b, tick+15); // stop at tick 16
-                track.add(noteOff);
+                tick += 16;
 
-                //third
-                a = new ShortMessage();
-                a.setMessage(144,1,third,100); //144 = on, 1 = keyboard, 44 = note, 100 = how loud and hard
-                noteOn = new MidiEvent(a, tick); // start at tick 1
-                track.add(noteOn);
-                b = new ShortMessage();
-                b.setMessage(128, 1, third, 100); //note off
-                noteOff = new MidiEvent(b, tick+15); // stop at tick 16
-                track.add(noteOff);
-
-                //fifth
-                a = new ShortMessage();
-                a.setMessage(144,1,fifth,100); //144 = on, 1 = keyboard, 44 = note, 100 = how loud and hard
-                noteOn = new MidiEvent(a, tick); // start at tick 1
-                track.add(noteOn);
-                b = new ShortMessage();
-                b.setMessage(128, 1, fifth, 100); //note off
-                noteOff = new MidiEvent(b, tick+15); // stop at tick 16
-                track.add(noteOff);
-
-                //seventh
-                if(type.equals("blues")){
-                    a = new ShortMessage();
-                    a.setMessage(144,1,seventh,100); //144 = on, 1 = keyboard, 44 = note, 100 = how loud and hard
-                    noteOn = new MidiEvent(a, tick); // start at tick 1
-                    track.add(noteOn);
-                    b = new ShortMessage();
-                    b.setMessage(128, 1, seventh, 100); //note off
-                    noteOff = new MidiEvent(b, tick+15); // stop at tick 16
-                    track.add(noteOff);
-                }
-
-                tick +=16;
             }
             player.setSequence(seq);
             player.setTempoInBPM(180);
@@ -394,93 +364,11 @@ public class MusicPlayer {
         }while(run);
     }
 
-//    private static Integer[] minor(int length) {
-////        Integer[] major_scale = new Integer[]{1, 3, 5, 6, 8, 10, 12, 13};
-////        Integer[] blues_scale = new Integer[]{1, 4, 6, 7, 8, 11, 13};
-//        Integer[] minor_scale = new Integer[]{1, 3, 4, 6, 8, 9, 11, 13};
-//
-//        Integer[] chords = new Integer[length];
-//        for(int i = 0; i < length; i++){
-//            if(i == 0 || i == length-1){
-//                chords[i] = 1;
-//            }else {
-//                chords[i] = (minor_scale[rand.nextInt(6) + 1]);
-//            }
-//        }
-//        return chords;
-//    }
     private static Integer[] blues(int length) {
         Integer[] chords = new Integer[]{1, 4, 1, 1,
                                          4, 4, 1, 1,
                                          2, 5, 1, 1};
         return chords;
-
-
     }
 
-    public static Integer[] major_minor(int length) {
-        Integer[] chords = new Integer[length];
-        for(int i = 0; i < length; i++){
-            if(i == 0 || (( chords[i-1] !=7 || chords[i-1] !=5 )&& i == length-1)){
-                chords[i] = 1;
-            }else if(i == length-2){
-                int num = rand.nextInt(3)+ 1;
-                if (num ==1){
-                    chords[i] = 5;
-                }
-                else if (num == 2){
-                    chords[i] = 4;
-                } else if(num == 3){
-                    chords[i] = 7;
-                }
-            } else {
-                switch(chords[i-1]){
-                    case 8:
-                    case 1:
-                        switch(rand.nextInt(4)+1) {
-                            case 1:
-                                chords[i] = 3;
-                                break;
-                            case 2:
-                                chords[i] = 6;
-                                break;
-                            case 3:
-                                chords[i] = rand.nextInt(2)+1 == 1? 2 : 4;
-                                break;
-                            case 4:
-                                chords[i] = rand.nextInt(2)+1 == 1? 5 : 7;
-                                break;
-                        }//end 1 chord switch
-                        break;
-                    case 4:
-                    case 2:
-                        switch(rand.nextInt(3)+1){
-                            case 1:
-                                chords[i] = rand.nextInt(2)+1 == 1? 2 : 4;
-                                break;
-                            case 2:
-                                chords[i] = rand.nextInt(2)+1 == 1? 5 : 7;
-                            case 3:
-                                chords[i] = 1;
-                        }
-                        break;
-                    case 3:
-                        chords[i] = rand.nextInt(2)+1 == 1? 6 : (rand.nextInt(2)+1 ==1?  2 : 4);
-                        break;
-                    case 5:
-                        chords[i] = 8;
-                        break;
-                    case 6:
-                        chords[i] = rand.nextInt(2)+1 == 1? 2 : 4;
-                        break;
-                    case 7:
-                        chords[i] = rand.nextInt(2)+1 == 1? 3 : 8;
-                        break;
-                    default:
-                        chords[i] = 1;
-                    }
-            }
-        }
-        return chords;
-    }
 }
