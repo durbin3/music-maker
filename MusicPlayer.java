@@ -39,6 +39,7 @@ class Tree {
     }
 }
 class Notes {
+
     static Integer[] major_scale = new Integer[]{1, 3, 5, 6, 8, 10, 12, 13};
     static Integer[] minor_scale = new Integer[]{1, 3, 4, 6, 8, 9, 11, 13};
     int root;
@@ -96,6 +97,30 @@ class Connectors {
     int start; //index of the start node
     int end; ////index of the end   node
     double weight;
+
+    static String[] roman = new String[]{"i","ii","iii","iv","v","vi","vii"};
+    static int toval(String inp) {
+        for (int i=0;i<roman.length;i++) {
+            if (roman[i].equals(inp)) {
+                return i;
+            }
+        }
+        return 0;
+    }
+    public Connectors() {
+    }
+
+    public Connectors(int s, int e, double w){
+        start = s;
+        end = e;
+        weight = w;
+    }
+
+    public Connectors(String s, String s1, String s2) {  /// new Connectors("ii","iv",".48"); previous >> (1,3,.49)
+        start = toval(s);
+        end = toval(s1);
+        weight = Double.parseDouble(s2);
+    }
 }
 
 class Path {
@@ -165,21 +190,81 @@ class Graph {
             nodes.add(new Nodes(g));
         }
     }
+    void updateConnections(String[][] strings) {
+        connectors.clear();
+
+        for(String[] c : strings){
+            connectors.add(new Connectors(c[0],c[1],c[2]));
+        }
+    }
+
     static Graph Majorgraph() {
         Graph graph = new Graph();
-        graph.updateNodes(new String[]{"C","D","E","F","G","A", "B"});
+        graph.updateNodes(new String[]{"C","D","E","F","G","A","B"});
+                                    ////0,, 1   2   3   4   5   6
+        graph.updateConnections(new String[][]{
+                //root chords
+                {"i" , "ii" , ".18"},
+                {"i" , "iii" , ".16"},
+                {"i" , "iv" , ".18"},
+                {"i" , "v" , ".16"},
+                {"i" , "vi" , ".16"},
+                {"i" , "vii" , ".16"},
+
+
+                //"dissonant" chords
+                {"iii","vi" , "1.0"},
+                {"vi", "ii" , "0.5"},
+                {"vi", "iv" , "0.5"},
+
+                //pre-dominants
+                {"ii", "vii", "0.5"},
+                {"ii", "v"  , "0.5"},
+                {"iv", "v"  , "0.5"},
+                {"iv", "vii", "0.5"},
+
+                //dominants
+                {"v" , "i"  , "1.0"},
+                {"vii","i"  , "0.5"},
+                {"vii","iii", "0.5"}
+        });
         return graph;
     }
     static Graph Minorgraph() {
         Graph graph = new Graph();
         graph.updateNodes(new String[]{"c","d","e","f","g","a", "b"});
+
+        graph.updateConnections(new String[][]{
+                //root chords
+                {"i", "ii", ".18"},
+                {"i", "iii", ".16"},
+                {"i", "iv", ".18"},
+                {"i", "v", ".16"},
+                {"i", "vi", ".16"},
+                {"i", "vii", ".16"},
+
+
+                //"dissonant" chords
+                {"iii", "vi", "1.0"},
+                {"vi", "ii", "0.5"},
+                {"vi", "iv", "0.5"},
+
+                //pre-dominants
+                {"ii", "vii", "0.5"},
+                {"ii", "v", "0.5"},
+                {"iv", "v", "0.5"},
+                {"iv", "vii", "0.3"},
+                {"iv", "iii", "0.2"},
+
+                //dominants
+                {"v", "i", "1.0"},
+                {"vii", "i", "1.0"}
+        });
         return graph;
     }
 
 
 }
-////////////
-
 
 public class MusicPlayer {
     public void GUI(){
@@ -329,6 +414,8 @@ public class MusicPlayer {
                                          4, 4, 1, 1,
                                          2, 5, 1, 1};
         return chords;
+
+
     }
 
     public static Integer[] major_minor(int length) {
