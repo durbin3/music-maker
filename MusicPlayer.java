@@ -100,7 +100,7 @@ class Connectors {
     int end; ////index of the end   node
     double weight;
 
-    static String[] roman = new String[]{"i","ii","iii","iv","v","vi","vii", "n"};
+    static String[] roman = new String[]{"i","ii","iii","iv","v","vi","vii", "n", "r"};
     static int toval(String inp) {
         for (int i=0;i<roman.length;i++) {
             if (roman[i].equals(inp)) {
@@ -214,7 +214,7 @@ class Graph {
 
     static Graph Majorgraph() {
         Graph graph = new Graph();
-        graph.updateNodes(new String[]{"C","D","E","F","G","A","B"});
+        graph.updateNodes(new String[]{"C","D","E","F","G","A","B","N","R"});
                                     ////0,, 1   2   3   4   5   6
         graph.updateConnections(new String[][]{
                 //root chords
@@ -227,6 +227,7 @@ class Graph {
 
 
                 //"dissonant" chords
+                {"iii","vi" , "1.0"},
                 {"iii","vi" , "1.0"},
                 {"vi", "ii" , "0.5"},
                 {"vi", "iv" , "0.5"},
