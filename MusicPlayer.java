@@ -1,4 +1,6 @@
 import com.sun.jdi.connect.Connector;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.w3c.dom.ls.LSOutput;
 
 import java.util.*;
@@ -9,31 +11,6 @@ import javax.swing.*;
 //TODO: rhythm generator
 //TODO: chord inversions
 
-class Tree {
-    Tree left = null;
-    Tree right = null;
-    int payload = 0;
-    public void addfive() {
-        payload+=5;
-        if (left != null) {left.addfive();}
-        if (right != null) {right.addfive();}
-    }
-    public void iterate(){
-        if(Math.random() > .5) {
-            if (left == null){
-                left = new Tree();
-            } else {
-                left.iterate();
-            }
-        } else {
-            if(right == null){
-                right = new Tree();
-            } else {
-                right.iterate();
-            }
-        }
-    }
-}
 class Notes {
     ArrayList<Integer> notes = new ArrayList<Integer>();
     static Integer[] major_scale = new Integer[]{1, 3, 5, 6, 8, 10, 12, 13};
@@ -91,8 +68,6 @@ class Connectors {
         }
         return 0;
     }
-    public Connectors() {
-    }
 
     public Connectors(int s, int e, double w){
         start = s;
@@ -116,10 +91,21 @@ class Path {
         newPathist.add(along.end);
         return new Path(newPathist, weight * along.weight);
     }
+    Path concatenate(Path then) {
+        ArrayList<Integer> newPathist = new ArrayList<Integer>(paths);
+        newPathist.addAll(then.paths);
+        return new Path(newPathist,weight * then.weight);
+    }
     Path(int start) {
         //construct a path based on the starting Node index
         paths = new ArrayList<Integer>();
         paths.add(start);
+    }
+    Path(int start,double w) {
+        //construct a path based on the starting Node index
+        paths = new ArrayList<Integer>();
+        paths.add(start);
+        weight = w;
     }
     private Path(ArrayList<Integer> npath,double w) {
         weight = w;
@@ -138,41 +124,47 @@ class Graph {
         }
         return connectionList;
     }
-    Path randomPathTo(int length,Path startpath,int endnode) {
-        int lastnode = startpath.paths.get(startpath.paths.size()-1);
+    HashMap<Pair<Integer,Integer>,Path> rando;
+    ArrayList<Notes> randomProgression(int length,int start,int end) {
+        rando = new HashMap();
+        return toMusical(randomPathTo(length,start,end));
+    }
+    private Path randomPathTo(int length,int lastnode,int endnode) {
+//        int lastnode = startpath.paths.get(startpath.paths.size()-1);
+        Pair<Integer,Integer> key = new ImmutablePair(length,lastnode);
+        if (rando.containsKey(key)) {return rando.get(key);}
         if (length == 1) {
-            if (lastnode == endnode) {return startpath;}
+            if (lastnode == endnode) {return new Path(lastnode);}
             return null;
         }
         ArrayList<Connectors> cArray = getConnected(lastnode);
-        ArrayList<Path> pArray = new ArrayList<Path>();
+        ArrayList<Pair<Path,Double>> pArray = new ArrayList();
 
         double rand = Math.random();
         for (Connectors connect:cArray) {
-            Path nextpath = randomPathTo(length-1,startpath.thenTo(connect),endnode);
+            Path nextpath = randomPathTo(length-1,connect.end,endnode);
             if (nextpath != null) {
-                nextpath.weight = connect.weight;
-                pArray.add(nextpath);
+                pArray.add(new ImmutablePair(nextpath,connect.weight));
             }
         }
         Path co = null;
         double totalWeight = 0;
-        for(Path path : pArray) {
-            totalWeight += path.weight;
+        for(Pair<Path,Double> path : pArray) {
+            totalWeight += path.getRight();
         }
-        for (Path path : pArray) {
-            rand -= path.weight/totalWeight; //e.g. rand = .39, .39 - .4 <0, co = this one
+        for (Pair<Path,Double> path : pArray) {
+            rand -= path.getRight()/totalWeight; //e.g. rand = .39, .39 - .4 <0, co = this one
             if (rand < 0) {
-                co = path;
+                co = new Path(lastnode,path.getRight()).concatenate(path.getLeft());
                 break;
             }
         }
+        rando.put(key,co);
         return co;
     }
     ArrayList<Notes> toMusical(Path p) {
         //[1,2,5,1]
         ArrayList<Notes> notes= new ArrayList<Notes>();
-
         for (int index : p.paths){
             notes.add(nodes.get(index).getNotes());
         }
@@ -191,12 +183,13 @@ class Graph {
             connectors.add(new Connectors(c[0],c[1],c[2]));
         }
     }
-
+    private static Graph majorgraph = null;
     static Graph Majorgraph() {
-        Graph graph = new Graph();
-        graph.updateNodes(new String[]{"C","D","E","F","G","A","B","N","Ni","R","Ci","Di","Ei","Fi","Gi","Ai","Bi","Nii", "Ri","Rii", "Cii","Dii","Eii","Fii","Gii","Aii","Bii"});
+        if (majorgraph != null) {return majorgraph;}
+        majorgraph = new Graph();
+        majorgraph.updateNodes(new String[]{"C","D","E","F","G","A","B","N","Ni","R","Ci","Di","Ei","Fi","Gi","Ai","Bi","Nii", "Ri","Rii", "Cii","Dii","Eii","Fii","Gii","Aii","Bii"});
                                     ////0,, 1   2   3   4   5   6   7   8    9   10   11   12   13   14   15   16   17     18   19     20     21    22    23    24    25    26
-        graph.updateConnections(new String[][]{
+        majorgraph.updateConnections(new String[][]{
                 //root chords
                 {"i" , "ii" , ".18"},
                 {"i" , "iii" , ".16"},
@@ -224,13 +217,15 @@ class Graph {
                 {"vii","i"  , "0.5"},
                 {"vii","iii", "0.5"}
         });
-        return graph;
+        return majorgraph;
     }
+    private static Graph minorgraph = null;
     static Graph Minorgraph() {
-        Graph graph = new Graph();
-        graph.updateNodes(new String[]{"c","d","e","f","g","a","b","n","ni","r","ci","di","ei","fi","gi","ai","bi","nii", "ri","rii", "cii","dii","eii","fii","gii","aii","bii"});
+        if (minorgraph!=null) {return minorgraph;}
+        minorgraph = new Graph();
+        minorgraph.updateNodes(new String[]{"c","d","e","f","g","a","b","n","ni","r","ci","di","ei","fi","gi","ai","bi","nii", "ri","rii", "cii","dii","eii","fii","gii","aii","bii"});
 
-        graph.updateConnections(new String[][]{
+        minorgraph.updateConnections(new String[][]{
                 //root chords
                 {"i", "ii", ".18"},
                 {"i", "iii", ".16"},
@@ -257,7 +252,7 @@ class Graph {
                 {"v", "i", "1.0"},
                 {"vii", "i", "1.0"}
         });
-        return graph;
+        return minorgraph;
     }
 }// end graph
 
@@ -304,8 +299,7 @@ public class MusicPlayer {
         Integer[] minor_scale = new Integer[]{1, 3, 4, 6, 8, 9, 11, 13};
         Integer[] blues_scale = new Integer[]{1, 4, 6, 7, 8, 11, 13};
 
-        Path path = new Path(0);
-        ArrayList<Notes> notes = graph.toMusical(graph.randomPathTo(progresLen, path, 0));
+        ArrayList<Notes> notes = graph.randomProgression(progresLen, 0, 0);
 
         for(Notes not: notes){
             System.out.println(Arrays.asList(major_scale).indexOf(not.notes.get(0)) + 1);
@@ -331,11 +325,11 @@ public class MusicPlayer {
         MusicPlayer mp = new MusicPlayer();
         System.out.println("Welcome to the music generator.");
         boolean run = false;
-        do{
+        do {
             mp.play();
             System.out.println("Would you like to rerun the program?");
             run = s.nextLine().equals("yes");
-        }while(run);
+        } while(run);
     }
 
     private static Integer[] blues(int length) {
