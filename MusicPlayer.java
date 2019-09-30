@@ -35,52 +35,33 @@ class Tree {
     }
 }
 class Notes {
-
+    ArrayList<Integer> notes = new ArrayList<Integer>();
     static Integer[] major_scale = new Integer[]{1, 3, 5, 6, 8, 10, 12, 13};
     static Integer[] minor_scale = new Integer[]{1, 3, 4, 6, 8, 9, 11, 13};
-    int root;
-    int third;
-    int fifth;
-    int seventh;
-    int ninth;
     boolean minor;
 
     Notes(String chord) {
-        if("cdefgab".contains(chord.toLowerCase())){ root = major_scale["cdefgab".indexOf(chord.toLowerCase().charAt(0))]; }
+        if("cdefgab".contains(chord.toLowerCase())){
+            notes.add(major_scale["cdefgab".indexOf(chord.toLowerCase().charAt(0))]);
+        }
         else {
             if(chord.toLowerCase().contains("n")){ // adfsadf = new Note("N6")
-                root = major_scale[1] - 1;
+                notes.add(major_scale[1] - 1);
             }
         }
+        int root = notes.get(0);
         minor = chord.substring(0,1).toLowerCase().equals(chord.substring(0,1));
-        if(minor) {
-            third = root + 3;
-            fifth = root + 7;
+        if(minor)
+        {
+            notes.add(notes.get(0) + 3);
+            notes.add(notes.get(0) + 7);
         } else {
-            third = root + 4;
-            fifth = root + 7;
+            notes.add(notes.get(0) + 4);
+            notes.add(notes.get(0) + 7);
         }
-        if (chord.toLowerCase().indexOf(1) != -1 && Character.isDigit(chord.toLowerCase().charAt(chord.length()-1))) {
-            int i = (chord.charAt(chord.length() - 1)) - 48;
-            if(i != 7){
-                seventh = 0;
-            }
-            if (i != 9) {
-                ninth = 0;
-            }
-        }
-        if ( chord.toLowerCase().indexOf(1) == -1){
-            seventh = 0;
-            ninth = 0;
-        }
+        if(chord.contains("7")) { notes.add(minor ? root + 10 : root + 11);}
+        if(chord.contains("9")) { notes.add(minor ? root + 14 : root + 14);}
     }//constructor
-
-    public void addSeventh() {
-        seventh = minor ? root + 10 : root + 11;
-    }
-    public void addNinth() {
-        ninth = minor ? root + 14 : root + 14;
-    }
 }
 
 class Nodes {
@@ -100,7 +81,8 @@ class Connectors {
     int end; ////index of the end   node
     double weight;
 
-    static String[] roman = new String[]{"i","ii","iii","iv","v","vi","vii", "n", "r"};
+    static String[] roman = new String[]{"i","ii","iii","iv","v","vi","vii", "n", "nn", "r", "ni","nii","niii","niv","nv","nvi","nvii","mn","nr","mr","mi","mii","miii","miv","mv","mvi","mvii"};
+    ///////////////////                  "C","D",  "E",  "F","G", "A", "B",  "N", "Ni", "R", "Ci", "Di", "Ei", "Fi", "Gi", "Ai", "Bi" , "MN", "NR", "MR","Cii",D////////
     static int toval(String inp) {
         for (int i=0;i<roman.length;i++) {
             if (roman[i].equals(inp)) {
@@ -169,6 +151,7 @@ class Graph {
         for (Connectors connect:cArray) {
             Path nextpath = randomPathTo(length-1,startpath.thenTo(connect),endnode);
             if (nextpath != null) {
+                nextpath.weight = connect.weight;
                 pArray.add(nextpath);
             }
         }
@@ -185,9 +168,6 @@ class Graph {
             }
         }
         return co;
-    }
-    void normalize() {
-
     }
     ArrayList<Notes> toMusical(Path p) {
         //[1,2,5,1]
@@ -214,8 +194,8 @@ class Graph {
 
     static Graph Majorgraph() {
         Graph graph = new Graph();
-        graph.updateNodes(new String[]{"C","D","E","F","G","A","B","N","R"});
-                                    ////0,, 1   2   3   4   5   6
+        graph.updateNodes(new String[]{"C","D","E","F","G","A","B","N","Ni","R","Ci","Di","Ei","Fi","Gi","Ai","Bi","Nii", "Ri","Rii", "Cii","Dii","Eii","Fii","Gii","Aii","Bii"});
+                                    ////0,, 1   2   3   4   5   6   7   8    9   10   11   12   13   14   15   16   17     18   19     20     21    22    23    24    25    26
         graph.updateConnections(new String[][]{
                 //root chords
                 {"i" , "ii" , ".18"},
@@ -248,7 +228,7 @@ class Graph {
     }
     static Graph Minorgraph() {
         Graph graph = new Graph();
-        graph.updateNodes(new String[]{"c","d","e","f","g","a", "b"});
+        graph.updateNodes(new String[]{"c","d","e","f","g","a","b","n","ni","r","ci","di","ei","fi","gi","ai","bi","nii", "ri","rii", "cii","dii","eii","fii","gii","aii","bii"});
 
         graph.updateConnections(new String[][]{
                 //root chords
@@ -328,23 +308,16 @@ public class MusicPlayer {
         ArrayList<Notes> notes = graph.toMusical(graph.randomPathTo(progresLen, path, 0));
 
         for(Notes not: notes){
-            System.out.println(Arrays.asList(major_scale).indexOf(not.root) + 1);
+            System.out.println(Arrays.asList(major_scale).indexOf(not.notes.get(0)) + 1);
         }
             int tick = 1;
             int octave = 52;
             //tick, octave, array list of Notes,
             for (Notes note : notes){
-                createNote(note.root  + octave, tick, track);
-                createNote(note.third + octave, tick, track);
-                createNote(note.fifth + octave, tick, track);
-                if(note.seventh != 0){
-                    createNote(note.seventh + octave, tick, track);
-                }
-                if(note.ninth != 0){
-                    createNote(note.ninth + octave, tick, track);
+                for(int index : note.notes) {
+                    createNote(index + octave, tick, track);
                 }
                 tick += 16;
-
             }
             player.setSequence(seq);
             player.setTempoInBPM(180);
