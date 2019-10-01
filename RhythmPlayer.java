@@ -175,7 +175,7 @@ public class RhythmPlayer {
             subdivider = new Subdivider(new int[]{2,2});//the last number here is a guess... it's probably two... (for all of these)
             tree = new Tree(new BeatFraction(1,2));
         } else if(type.equals("3/4")) {
-            subdivider = new Subdivider(new int[]{3,2,2});
+            subdivider = new Subdivider(new int[]{3,2});
             tree = new Tree(new BeatFraction(3,4));
         } else if(type.equals("4/4")) {
             subdivider = new Subdivider(new int[]{2,2,2});
@@ -188,7 +188,7 @@ public class RhythmPlayer {
             tree = new Tree(new BeatFraction(9,8));
         } else if(type.equals("12/8")) {
             subdivider = new Subdivider(new int[]{2,2,3,2});
-            tree = new Tree(new BeatFraction(3,4));
+            tree = new Tree(new BeatFraction(6,4));
         }
             tree.subdivide(subdivider);
             tree.populate(beats);
