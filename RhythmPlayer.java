@@ -1,5 +1,5 @@
-import javax.sound.midi.InvalidMidiDataException;
-import javax.sound.midi.MidiUnavailableException;
+import javax.sound.midi.*;
+import java.lang.reflect.Array;
 import java.util.*;
 
 //dotted quarter subdivisions:
@@ -79,22 +79,30 @@ class Subdivider {
         }
     }
     Subdivider next() {
-        return new Subdivider(weights, (ArrayList<Integer>) subdivseries.subList(1,subdivseries.size()));
+        ArrayList<Integer> nnex = new ArrayList();
+        for (int i=1;i<subdivseries.size();i++) {
+            nnex.add(subdivseries.get(i));
+        }
+        return new Subdivider(weights,nnex);
     }
     ArrayList<Tree> subdivide(BeatFraction beats) {
         if (subdivseries.size()==0) {return null;}
+        System.out.println("subdividing...");
         int subdiv = subdivseries.get(0);
+        System.out.print("subdiv: ");
+        System.out.println(subdiv);
         ArrayList<Double> wrow = getWeights(subdiv);
         double total = 0;
         for (int i = 0; i < wrow.size(); i++) {total += wrow.get(i);}
-        double rand = Math.random()*total;
+        double orand = Math.random()*total;
+        double rand = orand;
         for (int i = 0; i < wrow.size(); i++) {
             rand -= wrow.get(i);
             if (rand < 0) {
                 if (i == 0) {return null;}//they don't think it be like it is... but it do...
                 ArrayList<Tree> res = new ArrayList();
                 for (Integer not:allpartitions(subdiv).get(i)) {
-                    beats.times(new BeatFraction(not,subdiv+1));
+                    res.add(new Tree(beats.times(new BeatFraction(not,subdiv+1))));
                 }
                 return res;
             }
@@ -120,6 +128,7 @@ class Tree {
     }
     public void populate(ArrayList<BeatFraction> rhythm) {
         if (subtrees == null) {
+//            System.out.println(beats.num);
             rhythm.add(beats);//what a line
         } else {
             for (Tree t : subtrees) {
@@ -132,9 +141,82 @@ class Tree {
 
 
 public class RhythmPlayer {
+
+
+    public void createNote(int note, int tick,int length, Track track) throws InvalidMidiDataException {
+        ShortMessage a = new ShortMessage();
+        a.setMessage(144,1,note,100); //144 = on, 1 = keyboard, 44 = note, 100 = how loud and hard
+        MidiEvent noteOn = new MidiEvent(a, tick); // start at tick 1
+        track.add(noteOn);
+        ShortMessage b = new ShortMessage();
+        b.setMessage(128, 1, note, 100); //note off
+        MidiEvent noteOff = new MidiEvent(b, tick+length); // stop at tick 16
+        track.add(noteOff);
+    }
+    public void play() throws MidiUnavailableException, InvalidMidiDataException {
+//            GUI();
+        Sequencer player = MidiSystem.getSequencer();
+        player.open();
+        Sequence seq = new Sequence(Sequence.PPQ, 4);
+        Track track = seq.createTrack();
+
+        Scanner s = new Scanner(System.in);
+        System.out.println("How many measures of phat beats do you want?");
+        int progresLen = s.nextInt();
+        s.nextLine();
+
+        System.out.println("2/4, 3/4, 4/4, 6/8, 9/8, or 12/8?");
+        String type = s.nextLine().toLowerCase();
+        Subdivider subdivider = null;
+        Tree tree = null;
+        ArrayList<BeatFraction> beats = new ArrayList();
+        for (int i = 0; i < progresLen; i++) {
+        if(type.equals("2/4")) {
+            subdivider = new Subdivider(new int[]{2,2});//the last number here is a guess... it's probably two... (for all of these)
+            tree = new Tree(new BeatFraction(1,2));
+        } else if(type.equals("3/4")) {
+            subdivider = new Subdivider(new int[]{3,2,2});
+            tree = new Tree(new BeatFraction(3,4));
+        } else if(type.equals("4/4")) {
+            subdivider = new Subdivider(new int[]{2,2,2});
+            tree = new Tree(new BeatFraction(1,1));
+        } else if(type.equals("6/8")) {
+            subdivider = new Subdivider(new int[]{2,3,2});
+            tree = new Tree(new BeatFraction(3,4));
+        } else if(type.equals("9/8")) {
+            subdivider = new Subdivider(new int[]{3,3,2});
+            tree = new Tree(new BeatFraction(9,8));
+        } else if(type.equals("12/8")) {
+            subdivider = new Subdivider(new int[]{2,2,3,2});
+            tree = new Tree(new BeatFraction(3,4));
+        }
+            tree.subdivide(subdivider);
+            tree.populate(beats);
+        }
+
+        for(BeatFraction not: beats){
+            System.out.print(not.num);
+            System.out.print("/");
+            System.out.print(not.denom);
+            System.out.println();
+        }
+        int tick = 1;
+        int octave = 52;
+        //tick, octave, array list of Notes,
+        for (BeatFraction note : beats){
+            int newticks = (int)(note.toDouble()*16);
+            createNote(octave,tick,newticks,track);
+            tick += newticks;
+        }
+        player.setSequence(seq);
+        player.setTempoInBPM(180);
+        player.start();
+
+
+    }
     public static void main(String[] args) throws InvalidMidiDataException, MidiUnavailableException {
         Scanner s = new Scanner(System.in);
-        MusicPlayer mp = new MusicPlayer();
+        RhythmPlayer mp = new RhythmPlayer();
         System.out.println("Welcome to the rhythm generator.");
         boolean run = false;
         do{

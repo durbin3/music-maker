@@ -257,23 +257,15 @@ class Graph {
 }// end graph
 
 public class MusicPlayer {
-    public void createNote(int note, int tick, Track track) throws InvalidMidiDataException {
+    public void createNote(int note, int tick,int length, Track track) throws InvalidMidiDataException {
         ShortMessage a = new ShortMessage();
         a.setMessage(144,1,note,100); //144 = on, 1 = keyboard, 44 = note, 100 = how loud and hard
         MidiEvent noteOn = new MidiEvent(a, tick); // start at tick 1
         track.add(noteOn);
         ShortMessage b = new ShortMessage();
         b.setMessage(128, 1, note, 100); //note off
-        MidiEvent noteOff = new MidiEvent(b, tick+15); // stop at tick 16
+        MidiEvent noteOff = new MidiEvent(b, tick+length); // stop at tick 16
         track.add(noteOff);
-    }
-    public void GUI(){
-        JFrame frame = new JFrame();
-        JButton button = new JButton("Click this");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.getContentPane().add(button);
-        frame.setSize(400,400);
-        frame.setVisible(true);
     }
     public void play() throws MidiUnavailableException, InvalidMidiDataException {
 //            GUI();
@@ -287,12 +279,11 @@ public class MusicPlayer {
         s.nextLine();
         System.out.println("Major, or minor?");
         String type = s.nextLine().toLowerCase();
-        Graph g = new Graph();
-        Graph graph = new Graph();
+        Graph graph = null;
         if(type.equals("minor")) {
-            graph = g.Minorgraph();
+            graph = Graph.Minorgraph();
         } else if(type.equals("major")) {
-            graph = g.Majorgraph();
+            graph = Graph.Majorgraph();
         }
 
         Integer[] major_scale = new Integer[]{1, 3, 5, 6, 8, 10, 12, 13};
@@ -304,22 +295,21 @@ public class MusicPlayer {
         for(Notes not: notes){
             System.out.println(Arrays.asList(major_scale).indexOf(not.notes.get(0)) + 1);
         }
-            int tick = 1;
-            int octave = 52;
-            //tick, octave, array list of Notes,
-            for (Notes note : notes){
-                for(int index : note.notes) {
-                    createNote(index + octave, tick, track);
-                }
-                tick += 16;
+        int tick = 1;
+        int octave = 52;
+        //tick, octave, array list of Notes,
+        for (Notes note : notes){
+            for(int index : note.notes) {
+                createNote(index + octave, tick,15, track);
             }
-            player.setSequence(seq);
-            player.setTempoInBPM(180);
-            player.start();
+            tick += 16;
+        }
+        player.setSequence(seq);
+        player.setTempoInBPM(180);
+        player.start();
 
 
     }
-    public static Random rand = new Random();
     public static void main(String[] args) throws InvalidMidiDataException, MidiUnavailableException {
         Scanner s = new Scanner(System.in);
         MusicPlayer mp = new MusicPlayer();
@@ -330,13 +320,6 @@ public class MusicPlayer {
             System.out.println("Would you like to rerun the program?");
             run = s.nextLine().equals("yes");
         } while(run);
-    }
-
-    private static Integer[] blues(int length) {
-        Integer[] chords = new Integer[]{1, 4, 1, 1,
-                                         4, 4, 1, 1,
-                                         2, 5, 1, 1};
-        return chords;
     }
 
 }
