@@ -8,7 +8,7 @@ import javax.crypto.spec.PSource;
 import javax.sound.midi.*;
 import javax.swing.*;
 
-//TODO: rhythm generator
+//TODO: connect rhythm to music chords
 //TODO: chord inversions
 
 class Notes {
@@ -274,36 +274,109 @@ public class MusicPlayer {
         Sequence seq = new Sequence(Sequence.PPQ, 4);
         Track track = seq.createTrack();
         Scanner s = new Scanner(System.in);
-        System.out.println("How long do you want the chord progression to be?");
+        System.out.println("How long do you want the melody to be?");
         int progresLen = s.nextInt();
         s.nextLine();
         System.out.println("Major, or minor?");
-        String type = s.nextLine().toLowerCase();
+        String mood = s.nextLine().toLowerCase();
         Graph graph = null;
-        if(type.equals("minor")) {
+        if(mood.equals("minor")) {
             graph = Graph.Minorgraph();
-        } else if(type.equals("major")) {
+        } else if(mood.equals("major")) {
             graph = Graph.Majorgraph();
         }
+        int measure_length = 16;
 
+        //rhythm generator (parker's code, eric's comments)
+        System.out.println("2/4, 3/4, 4/4, 6/8, 9/8, or 12/8?");
+        String type = s.nextLine().toLowerCase();
+        Subdivider subdivider = null;
+        Tree tree = null;
+        ArrayList<BeatFraction> beats = new ArrayList();
+        //get the time signature and populate Tree with beats
+        for (int i = 0; i < progresLen; i++) {
+            if(type.equals("2/4")) {
+                measure_length = 8;
+                subdivider = new Subdivider(new int[]{2,2});//the last number here is a guess... it's probably two... (for all of these)
+                tree = new Tree(new BeatFraction(1,2));
+            } else if(type.equals("3/4")) {
+                measure_length = 12;
+                subdivider = new Subdivider(new int[]{3,2});
+                tree = new Tree(new BeatFraction(3,4));
+            } else if(type.equals("4/4")) {
+                measure_length = 16;
+                subdivider = new Subdivider(new int[]{2,2,2});
+                tree = new Tree(new BeatFraction(1,1));
+            } else if(type.equals("6/8")) {
+                measure_length = 8;
+                subdivider = new Subdivider(new int[]{2,3,2});
+                tree = new Tree(new BeatFraction(3,4));
+            } else if(type.equals("9/8")) {
+                measure_length = 12;
+                subdivider = new Subdivider(new int[]{3,3,2});
+                tree = new Tree(new BeatFraction(9,8));
+            } else if(type.equals("12/8")) {
+                measure_length = 16;
+                subdivider = new Subdivider(new int[]{2,2,3,2});
+                tree = new Tree(new BeatFraction(6,4));
+            }
+            tree.subdivide(subdivider);
+            tree.populate(beats);
+        }
+
+
+        // scales that may or may not be useful later
         Integer[] major_scale = new Integer[]{1, 3, 5, 6, 8, 10, 12, 13};
         Integer[] minor_scale = new Integer[]{1, 3, 4, 6, 8, 9, 11, 13};
         Integer[] blues_scale = new Integer[]{1, 4, 6, 7, 8, 11, 13};
 
-        ArrayList<Notes> notes = graph.randomProgression(progresLen, 0, 0);
 
+        //make the chord notes and then add them to the track
+        ArrayList<Notes> notes = graph.randomProgression(progresLen, 0, 0);
+        System.out.println("::::::Chords:::::::");
         for(Notes not: notes){
             System.out.println(Arrays.asList(major_scale).indexOf(not.notes.get(0)) + 1);
         }
-        int tick = 1;
+        int btick = 1;
+        int ctick = 1;
         int octave = 52;
         //tick, octave, array list of Notes,
         for (Notes note : notes){
+
+            //creates the base chord
             for(int index : note.notes) {
-                createNote(index + octave, tick,15, track);
+                createNote(index + octave, ctick,15, track);
             }
-            tick += 16;
+            ctick += measure_length;
         }
+        //end of chord notes
+
+        System.out.println(":::::::Rhythm junk::::::");
+        for(BeatFraction not: beats){
+            System.out.print(not.num);
+            System.out.print("/");
+            System.out.print(not.denom);
+            System.out.println();
+        }
+        //add the rhythm notes to track
+        System.out.println("Size===" + beats.size());
+        int tickCounter = 1;
+        int chordNumber = 0;
+        int chordRoot;
+        int newticks;
+        for (BeatFraction note : beats) {
+            newticks = (int) (note.toDouble() * 16);
+            tickCounter += newticks;
+            chordRoot = notes.get(chordNumber).notes.get(0);
+            if(tickCounter >= 16) {
+                tickCounter -= 16;
+                chordNumber +=1;
+            }
+            createNote(chordRoot+ octave + 12, btick, newticks, track);
+            btick += newticks;
+        }
+
+
         player.setSequence(seq);
         player.setTempoInBPM(180);
         player.start();
@@ -320,6 +393,7 @@ public class MusicPlayer {
             System.out.println("Would you like to rerun the program?");
             run = s.nextLine().equals("yes");
         } while(run);
+
     }
 
 }
