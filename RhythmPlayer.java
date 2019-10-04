@@ -20,6 +20,15 @@ class BeatFraction {
     BeatFraction times(BeatFraction other) {
         return new BeatFraction(this.num*other.num,this.denom*other.denom);
     }
+    Boolean greaterThanEqualTo(BeatFraction other) {
+        return this.num*other.denom>=other.num*this.denom;
+    }
+    BeatFraction plus(BeatFraction other) {
+        return new BeatFraction(this.num*other.denom+other.num*this.denom,this.denom*other.denom);
+    }
+    public BeatFraction minus(BeatFraction other) {
+        return new BeatFraction(this.num*other.denom-other.num*this.denom,this.denom*other.denom);
+    }
 }
 class Subdivider {
     static ArrayList<ArrayList<ArrayList<Integer>>> shortcut = new ArrayList();

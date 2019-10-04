@@ -16,16 +16,24 @@ class Notes {
     static Integer[] major_scale = new Integer[]{1, 3, 5, 6, 8, 10, 12, 13};
     static Integer[] minor_scale = new Integer[]{1, 3, 4, 6, 8, 9, 11, 13};
     boolean minor;
+    int invert = 0; // 0 = not inverted, 1 = first inversion, 2 = second inversion;
 
-    Notes(String chord) {
-        if("cdefgab".contains(chord.toLowerCase())){
+    Notes(String chord) { //input::: Ci, D, e, F7, g7ii
+        if ("cdefgab".contains(chord.toLowerCase().substring(0,1))) {
             notes.add(major_scale["cdefgab".indexOf(chord.toLowerCase().charAt(0))]);
+        } else if (chord.toLowerCase().contains("n") && !chord.toLowerCase().contains("i") && !chord.toLowerCase().contains("v") && !chord.toLowerCase().contains("r")) { // adfsadf = new Note("N6")
+            notes.add(major_scale[1] - 1);
         }
-        else {
-            if(chord.toLowerCase().contains("n")){ // adfsadf = new Note("N6")
-                notes.add(major_scale[1] - 1);
+
+        //setting the invert property to the type of inversion based on the last two characters and if they contain "ii"
+        if (chord.length() > 2) {
+            if (chord.substring(chord.length() - 1).contains("i")) {
+                invert = 1;
+            } else if (chord.substring((chord.length() - 2)).contains("ii")) {
+                invert = 2;
             }
         }
+
         int root = notes.get(0);
         minor = chord.substring(0,1).toLowerCase().equals(chord.substring(0,1));
         if(minor)
@@ -38,7 +46,29 @@ class Notes {
         }
         if(chord.contains("7")) { notes.add(minor ? root + 10 : root + 11);}
         if(chord.contains("9")) { notes.add(minor ? root + 14 : root + 14);}
+
+        //invert the chords
+        if (invert == 1) {
+            notes.set(0, notes.get(0) + 12);
+        } else if (invert == 2) {
+            notes.set(0, notes.get(0) + 12);
+            notes.set(1, notes.get(1) + 12);
+        }
+
     }//constructor
+
+
+    //fix octave gaps when called
+    void downOctave(){
+        for (int i = 0; i < notes.size(); i++) {
+            notes.set(i, notes.get(i) - 12);
+        }
+    }
+    void upOctave(){
+        for (int i = 0; i < notes.size(); i++) {
+            notes.set(i, notes.get(i) + 12);
+        }
+    }
 }
 
 class Nodes {
@@ -188,7 +218,7 @@ class Graph {
         if (majorgraph != null) {return majorgraph;}
         majorgraph = new Graph();
         majorgraph.updateNodes(new String[]{"C","D","E","F","G","A","B","N","Ni","R","Ci","Di","Ei","Fi","Gi","Ai","Bi","Nii", "Ri","Rii", "Cii","Dii","Eii","Fii","Gii","Aii","Bii"});
-                                    ////0,, 1   2   3   4   5   6   7   8    9   10   11   12   13   14   15   16   17     18   19     20     21    22    23    24    25    26
+                                   ///// ////0,, 1   2   3   4   5   6   7   8    9   10   11   12   13   14   15   16   17     18   19     20     21    22    23    24    25    26
         majorgraph.updateConnections(new String[][]{
                 //root chords
                 {"i" , "ii" , ".18"},
@@ -197,6 +227,20 @@ class Graph {
                 {"i" , "v" , ".16"},
                 {"i" , "vi" , ".16"},
                 {"i" , "vii" , ".16"},
+
+                {"ni" , "ii" , ".18"},
+                {"ni" , "iii" , ".16"},
+                {"ni" , "iv" , ".18"},
+                {"ni" , "v" , ".16"},
+                {"ni" , "vi" , ".16"},
+                {"ni" , "vii" , ".16"},
+
+                {"mi" , "ii" , ".18"},
+                {"mi" , "iii" , ".16"},
+                {"mi" , "iv" , ".18"},
+                {"mi" , "v" , ".16"},
+                {"mi" , "vi" , ".16"},
+                {"mi" , "vii" , ".16"},
 
 
                 //"dissonant" chords
@@ -207,6 +251,7 @@ class Graph {
 
                 //pre-dominants
                 {"ii", "vii", "0.5"},
+                {"ii", "mvii", "0.5"},
                 {"ii", "v"  , "0.5"},
                 {"iv", "v"  , "0.5"},
                 {"iv", "vii", "0.2"},
@@ -214,8 +259,13 @@ class Graph {
 
                 //dominants
                 {"v" , "i"  , "1.0"},
+                {"v" , "mi"  , "1.0"},
                 {"vii","i"  , "0.5"},
-                {"vii","iii", "0.5"}
+                {"vii","mi"  , "0.5"},
+                {"vii","iii", "0.5"},
+                {"mvii","i"  , "0.5"},
+                {"mvii","mi"  , "0.5"},
+                {"mvii","iii", "0.5"}
         });
         return majorgraph;
     }
@@ -285,41 +335,38 @@ public class MusicPlayer {
         } else if(mood.equals("major")) {
             graph = Graph.Majorgraph();
         }
-        int measure_length = 16;
 
         //rhythm generator (parker's code, eric's comments)
         System.out.println("2/4, 3/4, 4/4, 6/8, 9/8, or 12/8?");
         String type = s.nextLine().toLowerCase();
         Subdivider subdivider = null;
-        Tree tree = null;
         ArrayList<BeatFraction> beats = new ArrayList();
         //get the time signature and populate Tree with beats
+        BeatFraction fullbar = null;
+        if(type.equals("2/4")) {
+            subdivider = new Subdivider(new int[]{2,2});//the last number here is a guess... it's probably two... (for all of these)
+            fullbar = new BeatFraction(1,2);
+        } else if(type.equals("3/4")) {
+            subdivider = new Subdivider(new int[]{3,2});
+            fullbar = new BeatFraction(3,4);
+        } else if(type.equals("4/4")) {
+            subdivider = new Subdivider(new int[]{2,2,2});
+            fullbar = new BeatFraction(1,1);
+        } else if(type.equals("6/8")) {
+            subdivider = new Subdivider(new int[]{2,3});
+            fullbar = new BeatFraction(3,4);
+            subdivider.setWeight(2,new int[]{2},0.3);
+        } else if(type.equals("9/8")) {
+            subdivider = new Subdivider(new int[]{3,3});
+            fullbar = new BeatFraction(9,8);
+        } else if(type.equals("12/8")) {
+            subdivider = new Subdivider(new int[]{2,2,3});
+            subdivider.setWeight(2,new int[]{2},0.5);
+            subdivider.setWeight(3,new int[]{1,1,1},5.0);
+            fullbar = new BeatFraction(4,4);
+        }
         for (int i = 0; i < progresLen; i++) {
-            if(type.equals("2/4")) {
-                measure_length = 8;
-                subdivider = new Subdivider(new int[]{2,2});//the last number here is a guess... it's probably two... (for all of these)
-                tree = new Tree(new BeatFraction(1,2));
-            } else if(type.equals("3/4")) {
-                measure_length = 12;
-                subdivider = new Subdivider(new int[]{3,2});
-                tree = new Tree(new BeatFraction(3,4));
-            } else if(type.equals("4/4")) {
-                measure_length = 16;
-                subdivider = new Subdivider(new int[]{2,2,2});
-                tree = new Tree(new BeatFraction(1,1));
-            } else if(type.equals("6/8")) {
-                measure_length = 8;
-                subdivider = new Subdivider(new int[]{2,3,2});
-                tree = new Tree(new BeatFraction(3,4));
-            } else if(type.equals("9/8")) {
-                measure_length = 12;
-                subdivider = new Subdivider(new int[]{3,3,2});
-                tree = new Tree(new BeatFraction(9,8));
-            } else if(type.equals("12/8")) {
-                measure_length = 16;
-                subdivider = new Subdivider(new int[]{2,2,3,2});
-                tree = new Tree(new BeatFraction(6,4));
-            }
+            Tree tree = new Tree(fullbar);
             tree.subdivide(subdivider);
             tree.populate(beats);
         }
@@ -337,48 +384,68 @@ public class MusicPlayer {
         for(Notes not: notes){
             System.out.println(Arrays.asList(major_scale).indexOf(not.notes.get(0)) + 1);
         }
-        int btick = 1;
         int ctick = 1;
         int octave = 52;
+        Notes prevNote;
+        int measure_length = (int)(16*fullbar.toDouble());
         //tick, octave, array list of Notes,
-        for (Notes note : notes){
+        for (int i = 0; i < notes.size(); i++) {
+            Notes note = notes.get(i);
+            if (i > 0) prevNote = notes.get(i-1);         //////not sure if i want to make the octave corrections here or in the connection nodes....
+            else prevNote = notes.get(i);
 
+            if (prevNote.notes.get(0) - note.notes.get(0) < -6) {
+                note.downOctave();
+            }
+            else if (prevNote.notes.get(0) - note.notes.get(0) > 7) { note.upOctave(); }
             //creates the base chord
-            for(int index : note.notes) {
-                createNote(index + octave, ctick,15, track);
+            for (int index : note.notes) {
+                createNote(index + octave, ctick, measure_length, track);
             }
             ctick += measure_length;
         }
         //end of chord notes
 
         System.out.println(":::::::Rhythm junk::::::");
-        for(BeatFraction not: beats){
-            System.out.print(not.num);
-            System.out.print("/");
-            System.out.print(not.denom);
-            System.out.println();
-        }
+//        for(BeatFraction not: beats){
+//            System.out.print(not.num);
+//            System.out.print("/");
+//            System.out.print(not.denom);
+//            System.out.println();
+//        }
         //add the rhythm notes to track
-        System.out.println("Size===" + beats.size());
-        int tickCounter = 1;
+        System.out.println("Size=== " + beats.size());
+        int btick = 1;
+        BeatFraction tickCounter = new BeatFraction(0,1);
         int chordNumber = 0;
         int chordRoot;
         int newticks;
+        int selection;
+        Notes chord;
+        Random r = new Random();
         for (BeatFraction note : beats) {
             newticks = (int) (note.toDouble() * 16);
-            tickCounter += newticks;
-            chordRoot = notes.get(chordNumber).notes.get(0);
-            if(tickCounter >= 16) {
-                tickCounter -= 16;
+            tickCounter = tickCounter.plus(note);
+            chord = notes.get(chordNumber);
+
+            selection = chord.notes.get(r.nextInt(notes.get(chordNumber).notes.size())); //gets a random note in the chord
+            chordRoot = chord.notes.get(0); //gets the root of the chord
+
+
+            if(tickCounter.greaterThanEqualTo(fullbar) && chordNumber + 1 != notes.size()) {
+                tickCounter = tickCounter.minus(fullbar);
+                if (tickCounter.num != 0) {
+                    System.out.println("shit's fucked");
+                }
                 chordNumber +=1;
             }
-            createNote(chordRoot+ octave + 12, btick, newticks, track);
+            createNote(selection+ octave + 12, btick, newticks, track);
             btick += newticks;
         }
 
 
         player.setSequence(seq);
-        player.setTempoInBPM(180);
+        player.setTempoInBPM(120);
         player.start();
 
 
