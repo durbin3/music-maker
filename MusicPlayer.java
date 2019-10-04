@@ -10,6 +10,8 @@ import javax.swing.*;
 
 //TODO: connect rhythm to music chords
 //TODO: chord inversions
+//TODO: fix weird 0 chord
+//TODO: fix timing issues for notes not lining up with chords
 
 class Notes {
     ArrayList<Integer> notes = new ArrayList<Integer>();
