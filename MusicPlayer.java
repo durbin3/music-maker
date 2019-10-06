@@ -8,10 +8,6 @@ import javax.crypto.spec.PSource;
 import javax.sound.midi.*;
 import javax.swing.*;
 
-//TODO: connect rhythm to music chords
-//TODO: chord inversions
-//TODO: fix weird 0 chord
-//TODO: fix timing issues for notes not lining up with chords
 
 class Notes {
     ArrayList<Integer> notes = new ArrayList<Integer>();
@@ -58,7 +54,6 @@ class Notes {
         }
 
     }//constructor
-
 
     //fix octave gaps when called
     void downOctave(){
@@ -247,25 +242,35 @@ class Graph {
 
                 //"dissonant" chords
                 {"iii","vi" , "1.0"},
-                {"iii","vi" , "1.0"},
+                {"iii","nvi" , "1.0"},
+                {"niii","vi" , "1.0"},
                 {"vi", "ii" , "0.5"},
+                {"nvi", "ii" , "0.5"},
+                {"nvi", "nii" , "0.5"},
+                {"mvi", "ii" , "0.5"},
                 {"vi", "iv" , "0.5"},
+                {"nvi", "iv" , "0.5"},
 
                 //pre-dominants
                 {"ii", "vii", "0.5"},
                 {"ii", "mvii", "0.5"},
                 {"ii", "v"  , "0.5"},
+                {"nii","v"  , "0.5"},
                 {"iv", "v"  , "0.5"},
                 {"iv", "vii", "0.2"},
+                {"niv", "vii", "0.2"},
                 {"iv", "i"  , "0.3"},
 
                 //dominants
                 {"v" , "i"  , "1.0"},
+                {"nv" , "i"  , "1.0"},
+                {"mv" , "i"  , "1.0"},
+                {"mv" , "ni"  , "1.0"},
                 {"v" , "mi"  , "1.0"},
                 {"vii","i"  , "0.5"},
                 {"vii","mi"  , "0.5"},
                 {"vii","iii", "0.5"},
-                {"mvii","i"  , "0.5"},
+                {"mvii","ni"  , "0.5"},
                 {"mvii","mi"  , "0.5"},
                 {"mvii","iii", "0.5"}
         });
@@ -309,13 +314,29 @@ class Graph {
 }// end graph
 
 public class MusicPlayer {
-    public void createNote(int note, int tick,int length, Track track) throws InvalidMidiDataException {
+    public void createNote(int note, int tick,int length, Track track, String role) throws InvalidMidiDataException {
+        int loudness;
+        int channel;
+        if (role.equals("bass")){
+
+            loudness = 50;
+            channel = 1;
+        } else if (role.equals("drums")) {
+            //TODO: change instrument to drums
+            loudness = 75;
+            channel = 10;
+
+        } else {
+            loudness = 100;
+            channel = 1;
+        }
+
         ShortMessage a = new ShortMessage();
-        a.setMessage(144,1,note,100); //144 = on, 1 = keyboard, 44 = note, 100 = how loud and hard
+        a.setMessage(144,channel,note,loudness); //144 = on, 1 = keyboard, 44 = note, 100 = how loud and hard
         MidiEvent noteOn = new MidiEvent(a, tick); // start at tick 1
         track.add(noteOn);
         ShortMessage b = new ShortMessage();
-        b.setMessage(128, 1, note, 100); //note off
+        b.setMessage(128, channel, note, loudness); //note off
         MidiEvent noteOff = new MidiEvent(b, tick+length); // stop at tick 16
         track.add(noteOff);
     }
@@ -356,16 +377,16 @@ public class MusicPlayer {
             fullbar = new BeatFraction(1,1);
         } else if(type.equals("6/8")) {
             subdivider = new Subdivider(new int[]{2,3});
-            fullbar = new BeatFraction(3,4);
+            fullbar = new BeatFraction(6,8);
             subdivider.setWeight(2,new int[]{2},0.3);
         } else if(type.equals("9/8")) {
             subdivider = new Subdivider(new int[]{3,3});
             fullbar = new BeatFraction(9,8);
         } else if(type.equals("12/8")) {
             subdivider = new Subdivider(new int[]{2,2,3});
-            subdivider.setWeight(2,new int[]{2},0.5);
-            subdivider.setWeight(3,new int[]{1,1,1},5.0);
-            fullbar = new BeatFraction(4,4);
+//            subdivider.setWeight(2,new int[]{2},0.5);
+//            subdivider.setWeight(3,new int[]{1,1,1},5.0);
+            fullbar = new BeatFraction(12,8);
         }
         for (int i = 0; i < progresLen; i++) {
             Tree tree = new Tree(fullbar);
@@ -384,8 +405,17 @@ public class MusicPlayer {
         ArrayList<Notes> notes = graph.randomProgression(progresLen, 0, 0);
         System.out.println("::::::Chords:::::::");
         for(Notes not: notes){
+            Notes nott = not;
+            //fixes the out of bounds error for printing
+            while(nott.notes.get(0) > 12) {
+                nott.downOctave();
+            }
+            while(nott.notes.get(0) < 1){
+                nott.upOctave();
+            }
             System.out.println(Arrays.asList(major_scale).indexOf(not.notes.get(0)) + 1);
         }
+
         int ctick = 1;
         int octave = 52;
         Notes prevNote;
@@ -393,7 +423,7 @@ public class MusicPlayer {
         //tick, octave, array list of Notes,
         for (int i = 0; i < notes.size(); i++) {
             Notes note = notes.get(i);
-            if (i > 0) prevNote = notes.get(i-1);         //////not sure if i want to make the octave corrections here or in the connection nodes....
+            if (i > 0) prevNote = notes.get(i-1);
             else prevNote = notes.get(i);
 
             if (prevNote.notes.get(0) - note.notes.get(0) < -6) {
@@ -402,9 +432,21 @@ public class MusicPlayer {
             else if (prevNote.notes.get(0) - note.notes.get(0) > 7) { note.upOctave(); }
             //creates the base chord
             for (int index : note.notes) {
-                createNote(index + octave, ctick, measure_length, track);
+                //metronome for testing purposes
+                //ugly metronome TODO: remove this
+                createNote(index + octave, ctick, measure_length, track, "bass");
+//                createNote(93, ctick + 4, measure_length, track,"");
+//                createNote(93, ctick + 8, measure_length, track,"");
+//                createNote(93, ctick + 12, measure_length, track,"");
+
+//                createNote(93, ctick + 6, measure_length, track,"");
+//                createNote(93, ctick + 12, measure_length, track,"");
+
+
+
             }
             ctick += measure_length;
+
         }
         //end of chord notes
 
@@ -418,34 +460,85 @@ public class MusicPlayer {
         //add the rhythm notes to track
         System.out.println("Size=== " + beats.size());
         int btick = 1;
-        BeatFraction tickCounter = new BeatFraction(0,1);
+        int tickCounter = 0;
         int chordNumber = 0;
         int chordRoot;
         int newticks;
         int selection;
+        int RprevNote = -999;
+        int distance = 0;
+        int distToGo;
+        ArrayList<Integer> allTheNotes = new ArrayList<>();
         Notes chord;
         Random r = new Random();
         for (BeatFraction note : beats) {
-            newticks = (int) (note.toDouble() * 16);
-            tickCounter = tickCounter.plus(note);
-            chord = notes.get(chordNumber);
+            newticks = (int)(note.toDouble() * 16);
+//            System.out.println("Note length: " + newticks);
+            switch(newticks){
+                case 2:
+                    System.out.print(",");
+                    break;
+                case 4:
+                    System.out.print("c ");
+                    break;
+                case 8:
+                    System.out.print("d ");
+                    break;
+                case 6:
+                    System.out.print("c. ");
+                    break;
+                case 12:
+                    System.out.print("d. ");
+                    break;
+                case 16:
+                    System.out.print("O ");
+                    break;
+                case 18:
+                    System.out.print("(d._c.) ");
+                    break;
+                case 24:
+                    System.out.print("O. ");
+                    break;
+                default:
+                    System.out.print("Note length: " + newticks + "\n");
 
-            selection = chord.notes.get(r.nextInt(notes.get(chordNumber).notes.size())); //gets a random note in the chord
-            chordRoot = chord.notes.get(0); //gets the root of the chord
-
-
-            if(tickCounter.greaterThanEqualTo(fullbar) && chordNumber + 1 != notes.size()) {
-                tickCounter = tickCounter.minus(fullbar);
-                if (tickCounter.num != 0) {
-                    System.out.println("shit's fucked");
-                }
-                chordNumber +=1;
             }
-            createNote(selection+ octave + 12, btick, newticks, track);
+            tickCounter += newticks;
+            chord = notes.get(chordNumber);
+//            if(RprevNote == -999) RprevNote = chord.notes.get(0);
+//
+//            distance = 4; //4 indices or less
+//            distToGo = r.nextInt(2 * distance); //output the amount of indices to change
+//            if(distToGo > 4){}
+//            if(newticks >= 8) {
+//                selection = chord.notes.get(r.nextInt(notes.get(chordNumber).notes.size())); //gets a random note in the chord
+//            }
+            selection = chord.notes.get(r.nextInt(notes.get(chordNumber).notes.size())); //gets a random note in the chord
+//            else {selection = major_scale[r.nextInt(major_scale.length)];}
+//            selection = chord.notes.get(0); //gets the root of the chord
+//            System.out.println(Arrays.asList(major_scale).indexOf(chord.notes.get(0)) + 1);
+            if(RprevNote - selection >= 6){ selection += 12; }
+            else if(RprevNote - selection <= -6) { selection -= 12; }
+            if(((chordNumber + 1) == notes.size()) && note.equals(beats.get(beats.size()-1))){
+                if(Math.abs(RprevNote - chord.notes.get(0)) > 5) { selection = chord.notes.get(0) + 12; }
+                else { selection = chord.notes.get(0); }
+            }
+            RprevNote = selection;
+            if(tickCounter >= measure_length && chordNumber + 1 != notes.size()) {
+//                tickCounter = tickCounter.minus(fullbar);
+//                System.out.println("-----------");
+                System.out.print("| ");
+
+                tickCounter = 0;
+                chordNumber +=1;
+
+            }
+            createNote(selection+ octave + 12, btick, newticks, track, "melody");
             btick += newticks;
+
         }
 
-
+        System.out.println();
         player.setSequence(seq);
         player.setTempoInBPM(120);
         player.start();

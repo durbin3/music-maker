@@ -29,6 +29,9 @@ class BeatFraction {
     public BeatFraction minus(BeatFraction other) {
         return new BeatFraction(this.num*other.denom-other.num*this.denom,this.denom*other.denom);
     }
+    public void setToZero(){
+        this.num = 0;
+    }
 }
 class Subdivider {
     static ArrayList<ArrayList<ArrayList<Integer>>> shortcut = new ArrayList();
